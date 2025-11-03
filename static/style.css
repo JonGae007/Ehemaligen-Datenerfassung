@@ -1,14 +1,12 @@
-/* Reset und Basis-Styling */
+
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-/* System Theme Support */
 :root {
     color-scheme: light dark;
-    /* Light Mode Variablen */
     --bg-primary: #ffffff;
     --bg-secondary: #f8f9fa;
     --bg-accent: #e9ecef;
@@ -29,7 +27,6 @@
     --shadow-hover: rgba(0, 0, 0, 0.15);
 }
 
-/* Dark Mode Variablen */
 @media (prefers-color-scheme: dark) {
     :root {
         --bg-primary: #212529;
@@ -71,7 +68,6 @@ body {
     flex-direction: column;
 }
 
-/* Header Styling */
 header {
     text-align: center;
     margin-bottom: 24px;
@@ -94,7 +90,6 @@ header p {
     font-size: 1rem;
 }
 
-/* Admin Header */
 .admin-header {
     display: flex;
     justify-content: space-between;
@@ -133,7 +128,6 @@ header p {
     background: var(--button-danger-hover);
 }
 
-/* Nachrichten */
 .messages {
     margin-bottom: 16px;
 }
@@ -158,7 +152,6 @@ header p {
     border-color: var(--button-danger);
 }
 
-/* Hauptinhalt */
 main {
     flex: 1;
     display: flex;
@@ -166,7 +159,6 @@ main {
     gap: 24px;
 }
 
-/* Formulare */
 .data-form,
 .login-form {
     background: var(--bg-primary);
@@ -231,7 +223,6 @@ main {
     cursor: not-allowed;
 }
 
-/* Login Info */
 .login-info {
     background: var(--bg-accent);
     padding: 16px;
@@ -247,8 +238,6 @@ main {
     font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
     color: var(--text-primary);
 }
-
-/* Admin Dashboard */
 .stats-section,
 .data-section,
 .export-section,
@@ -301,7 +290,6 @@ main {
     margin: 0;
 }
 
-/* Tabellen */
 .table-container {
     margin-top: 16px;
 }
@@ -317,7 +305,7 @@ main {
     width: 100%;
     border-collapse: collapse;
     background: var(--bg-primary);
-    min-width: 600px; /* Mindestbreite für Mobile */
+    min-width: 600px; 
 }
 
 .data-table th {
@@ -441,7 +429,6 @@ main {
     color: white;
 }
 
-/* Datenschutz-Status */
 .privacy-status {
     display: inline-block;
     padding: 2px 6px;
@@ -467,7 +454,6 @@ main {
     margin-top: 2px;
 }
 
-/* Export-Funktionen */
 .export-buttons {
     display: flex;
     flex-direction: column;
@@ -556,7 +542,6 @@ main {
     font-size: 0.8rem;
 }
 
-/* Benutzerverwaltung */
 .add-user-section,
 .users-section {
     background: var(--bg-primary);
@@ -603,7 +588,6 @@ main {
     background: var(--button-primary-hover);
 }
 
-/* Modal */
 .modal {
     position: fixed;
     top: 0;
@@ -689,7 +673,6 @@ main {
     background: var(--bg-secondary);
 }
 
-/* Mobile Optimierung für Benutzerverwaltung */
 @media (max-width: 768px) {
     .form-row {
         flex-direction: column;
@@ -721,7 +704,6 @@ main {
     }
 }
 
-/* Footer */
 footer {
     margin-top: 24px;
     text-align: center;
@@ -743,7 +725,6 @@ footer a:hover {
     color: var(--text-primary);
 }
 
-/* Datenschutz-Checkbox */
 .checkbox-group {
     margin: 16px 0;
 }
@@ -778,7 +759,6 @@ footer a:hover {
     font-weight: bold;
 }
 
-/* Jahrgangs-Verwaltung */
 .form-inline {
     display: flex;
     gap: 12px;
@@ -846,7 +826,6 @@ footer a:hover {
     font-weight: 600;
 }
 
-/* Datenschutzerklärung */
 .privacy-content {
     background: var(--bg-primary);
     padding: 24px;
@@ -913,7 +892,6 @@ footer a:hover {
     background: var(--button-primary-hover);
 }
 
-/* Mobile Responsive Design */
 @media (max-width: 768px) {
     .container {
         padding: 12px;
@@ -1037,7 +1015,6 @@ footer a:hover {
     }
 }
 
-/* Datenschutz-Checkbox */
 .checkbox-group {
     margin: 20px 0;
 }
@@ -1071,7 +1048,6 @@ footer a:hover {
     font-weight: bold;
 }
 
-/* Jahrgangs-Verwaltung */
 .add-jahrgang-section {
     background: var(--bg-primary);
     padding: 25px;
@@ -1214,7 +1190,6 @@ footer a:hover {
     border-bottom: none;
 }
 
-/* Datenschutzerklärung */
 .privacy-content {
     background: var(--bg-primary);
     padding: 30px;
@@ -1281,7 +1256,6 @@ footer a:hover {
     transform: translateY(-2px);
 }
 
-/* Animationen */
 @keyframes fadeIn {
     from {
         opacity: 0;

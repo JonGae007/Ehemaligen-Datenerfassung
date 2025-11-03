@@ -1,4 +1,3 @@
-// Sortierbare Tabellen
 document.addEventListener('DOMContentLoaded', function() {
     // Alle Tabellen mit der Klasse 'sortable' sortierbar machen
     const tables = document.querySelectorAll('.data-table');

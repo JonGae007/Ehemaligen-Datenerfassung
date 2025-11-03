@@ -4,71 +4,11 @@ import hashlib
 import datetime
 import csv
 import io
+import secrets
 
 app = flask.Flask(__name__)
-app.secret_key = 'your-secret-key-here'  # In Produktion sollte das sicherer sein
+app.secret_key = secrets.token_urlsafe(48)
 DATABASE = 'database.db'
-
-def init_db():
-    """Initialisiere die Datenbank mit den benötigten Tabellen"""
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    
-    # Prüfe ob die Tabelle bereits existiert und füge fehlende Spalten hinzu
-    try:
-        # Prüfe ob datenschutz_datum Spalte existiert
-        cursor.execute("PRAGMA table_info(schueler_daten)")
-        columns = [column[1] for column in cursor.fetchall()]
-        
-        # Füge fehlende Spalten hinzu falls sie nicht existieren
-        if 'datenschutz_einwilligung' not in columns:
-            cursor.execute('ALTER TABLE schueler_daten ADD COLUMN datenschutz_einwilligung BOOLEAN NOT NULL DEFAULT 1')
-        
-        if 'datenschutz_datum' not in columns:
-            cursor.execute('ALTER TABLE schueler_daten ADD COLUMN datenschutz_datum TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
-            
-    except sqlite3.OperationalError:
-        # Tabelle existiert noch nicht, wird unten erstellt
-        pass
-    
-    # Tabelle für Abitur-Jahrgänge
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS abitur_jahrgaenge (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            jahrgang INTEGER UNIQUE NOT NULL,
-            aktiv BOOLEAN DEFAULT 1
-        )
-    ''')
-    
-    # Tabelle für Schülerdaten
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS schueler_daten (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            jahrgang_id INTEGER NOT NULL,
-            vorname TEXT NOT NULL,
-            nachname TEXT NOT NULL,
-            email TEXT NOT NULL,
-            datenschutz_einwilligung BOOLEAN NOT NULL DEFAULT 1,
-            datenschutz_datum TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (jahrgang_id) REFERENCES abitur_jahrgaenge (id)
-        )
-    ''')
-    
-    # Admin-Tabelle (einfaches System mit Benutzername und Passwort)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS admins (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            benutzername TEXT UNIQUE NOT NULL,
-            passwort_hash TEXT NOT NULL
-        )
-    ''')
-    
-    # Standard-Jahrgänge hinzufügen (2020-2030)
-
-    
-    conn.commit()
-    conn.close()
 
 def get_db_connection():
     """Hilfsfunktion für Datenbankverbindungen"""
@@ -76,6 +16,9 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+#===========================================================
+#                     Webseiten Routen
+#===========================================================
 @app.route('/')
 def home():
     """Hauptseite mit Formular für Schülerdaten"""
@@ -83,6 +26,69 @@ def home():
     jahrgaenge = conn.execute('SELECT * FROM abitur_jahrgaenge WHERE aktiv = 1 ORDER BY jahrgang DESC').fetchall()
     conn.close()
     return flask.render_template('index.html', jahrgaenge=jahrgaenge)
+
+@app.route('/datenschutz')
+def datenschutz():
+    """Datenschutzerklärung"""
+    return flask.render_template('datenschutz.html')
+
+@app.route('/admin/jahrgaenge')
+def admin_jahrgaenge():
+    """Jahrgangs-Verwaltung"""
+    if 'admin_logged_in' not in flask.session:
+        return flask.redirect(flask.url_for('admin_login'))
+    
+    conn = get_db_connection()
+    jahrgaenge = conn.execute('''
+        SELECT a.*, COUNT(s.id) as schueler_anzahl 
+        FROM abitur_jahrgaenge a
+        LEFT JOIN schueler_daten s ON a.id = s.jahrgang_id
+        GROUP BY a.id
+        ORDER BY a.jahrgang DESC
+    ''').fetchall()
+    conn.close()
+    
+    return flask.render_template('admin_jahrgaenge.html', jahrgaenge=jahrgaenge)
+
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    """Admin-Dashboard mit Übersicht aller Daten"""
+    if 'admin_logged_in' not in flask.session:
+        return flask.redirect(flask.url_for('admin_login'))
+    
+    conn = get_db_connection()
+    
+    # Alle Schülerdaten mit Jahrgang abrufen
+    schueler = conn.execute('''
+        SELECT s.*, a.jahrgang 
+        FROM schueler_daten s
+        JOIN abitur_jahrgaenge a ON s.jahrgang_id = a.id
+        ORDER BY s.erstellt_am DESC
+    ''').fetchall()
+    
+    # Statistiken
+    stats = conn.execute('''
+        SELECT 
+            COUNT(*) as total_schueler,
+            COUNT(DISTINCT jahrgang_id) as aktive_jahrgaenge
+        FROM schueler_daten
+    ''').fetchone()
+    
+    conn.close()
+    
+    return flask.render_template('admin_dashboard.html', schueler=schueler, stats=stats)
+
+@app.route('/admin')
+def admin_login():
+    """Admin-Login Seite"""
+    if 'admin_logged_in' in flask.session:
+        return flask.redirect(flask.url_for('admin_dashboard'))
+    return flask.render_template('admin_login.html')
+
+
+#===========================================================
+#                      API Endpoints
+#===========================================================
 
 @app.route('/submit', methods=['POST'])
 def submit_data():
@@ -115,12 +121,6 @@ def submit_data():
     
     return flask.redirect(flask.url_for('home'))
 
-@app.route('/admin')
-def admin_login():
-    """Admin-Login Seite"""
-    if 'admin_logged_in' in flask.session:
-        return flask.redirect(flask.url_for('admin_dashboard'))
-    return flask.render_template('admin_login.html')
 
 @app.route('/admin/login', methods=['POST'])
 def admin_login_post():
@@ -154,65 +154,8 @@ def admin_logout():
     flask.session.pop('admin_id', None)
     return flask.redirect(flask.url_for('home'))
 
-@app.route('/admin/dashboard')
-def admin_dashboard():
-    """Admin-Dashboard mit Übersicht aller Daten"""
-    if 'admin_logged_in' not in flask.session:
-        return flask.redirect(flask.url_for('admin_login'))
-    
-    conn = get_db_connection()
-    
-    # Alle Schülerdaten mit Jahrgang abrufen
-    schueler = conn.execute('''
-        SELECT s.*, a.jahrgang 
-        FROM schueler_daten s
-        JOIN abitur_jahrgaenge a ON s.jahrgang_id = a.id
-        ORDER BY s.erstellt_am DESC
-    ''').fetchall()
-    
-    # Statistiken
-    stats = conn.execute('''
-        SELECT 
-            COUNT(*) as total_schueler,
-            COUNT(DISTINCT jahrgang_id) as aktive_jahrgaenge
-        FROM schueler_daten
-    ''').fetchone()
-    
-    conn.close()
-    
-    return flask.render_template('admin_dashboard.html', schueler=schueler, stats=stats)
 
-@app.route('/admin/delete/<int:schueler_id>')
-def admin_delete_schueler(schueler_id):
-    """Lösche einen Schüler-Eintrag"""
-    if 'admin_logged_in' not in flask.session:
-        return flask.redirect(flask.url_for('admin_login'))
-    
-    conn = get_db_connection()
-    conn.execute('DELETE FROM schueler_daten WHERE id = ?', (schueler_id,))
-    conn.commit()
-    conn.close()
-    
-    flask.flash('Eintrag erfolgreich gelöscht!', 'success')
-    return flask.redirect(flask.url_for('admin_dashboard'))
 
-@app.route('/admin/jahrgaenge')
-def admin_jahrgaenge():
-    """Jahrgangs-Verwaltung"""
-    if 'admin_logged_in' not in flask.session:
-        return flask.redirect(flask.url_for('admin_login'))
-    
-    conn = get_db_connection()
-    jahrgaenge = conn.execute('''
-        SELECT a.*, COUNT(s.id) as schueler_anzahl 
-        FROM abitur_jahrgaenge a
-        LEFT JOIN schueler_daten s ON a.id = s.jahrgang_id
-        GROUP BY a.id
-        ORDER BY a.jahrgang DESC
-    ''').fetchall()
-    conn.close()
-    
-    return flask.render_template('admin_jahrgaenge.html', jahrgaenge=jahrgaenge)
 
 @app.route('/admin/jahrgang/add', methods=['POST'])
 def admin_add_jahrgang():
@@ -288,10 +231,10 @@ def admin_delete_jahrgang(jahrgang_id):
         schueler_count = conn.execute('SELECT COUNT(*) as count FROM schueler_daten WHERE jahrgang_id = ?', 
                                       (jahrgang_id,)).fetchone()
         
-        # Erst alle Schüler des Jahrgangs löschen
+        # Alle Schüler des Jahrgangs löschen
         conn.execute('DELETE FROM schueler_daten WHERE jahrgang_id = ?', (jahrgang_id,))
         
-        # Dann den Jahrgang löschen
+        # Jahrgang löschen
         conn.execute('DELETE FROM abitur_jahrgaenge WHERE id = ?', (jahrgang_id,))
         
         conn.commit()
@@ -328,18 +271,10 @@ def admin_export_csv():
             JOIN abitur_jahrgaenge a ON s.jahrgang_id = a.id
             ORDER BY a.jahrgang DESC, s.nachname, s.vorname
         ''').fetchall()
-    except sqlite3.OperationalError:
-        # Fallback für alte Datenbankstruktur ohne Datenschutz-Spalten
-        schueler = conn.execute('''
-            SELECT s.jahrgang_id, a.jahrgang, s.vorname, s.nachname, s.email, 
-                   1 as datenschutz_einwilligung, 
-                   s.erstellt_am as datenschutz_datum, 
-                   s.erstellt_am
-            FROM schueler_daten s
-            JOIN abitur_jahrgaenge a ON s.jahrgang_id = a.id
-            ORDER BY a.jahrgang DESC, s.nachname, s.vorname
-        ''').fetchall()
-    
+    except Exception as e:
+        flask.flash(f'Fehler beim Abrufen der Schülerdaten: {str(e)}', 'error')
+        return flask.redirect(flask.url_for('admin_dashboard'))
+
     conn.close()
     
     # CSV-Datei erstellen
@@ -369,7 +304,6 @@ def admin_export_csv():
             schueler_eintrag['erstellt_am']
         ])
     
-    # Response mit CSV-Daten
     csv_data = output.getvalue()
     output.close()
     
@@ -412,18 +346,9 @@ def admin_export_csv_jahrgang(jahrgang_id):
             WHERE s.jahrgang_id = ?
             ORDER BY s.nachname, s.vorname
         ''', (jahrgang_id,)).fetchall()
-    except sqlite3.OperationalError:
-        # Fallback für alte Datenbankstruktur ohne Datenschutz-Spalten
-        schueler = conn.execute('''
-            SELECT s.jahrgang_id, a.jahrgang, s.vorname, s.nachname, s.email, 
-                   1 as datenschutz_einwilligung, 
-                   s.erstellt_am as datenschutz_datum, 
-                   s.erstellt_am
-            FROM schueler_daten s
-            JOIN abitur_jahrgaenge a ON s.jahrgang_id = a.id
-            WHERE s.jahrgang_id = ?
-            ORDER BY s.nachname, s.vorname
-        ''', (jahrgang_id,)).fetchall()
+    except Exception as e:
+        flask.flash(f'Fehler beim Abrufen der Schülerdaten: {str(e)}', 'error')
+        return flask.redirect(flask.url_for('admin_dashboard'))
     
     conn.close()
     
@@ -458,7 +383,6 @@ def admin_export_csv_jahrgang(jahrgang_id):
             schueler_eintrag['erstellt_am']
         ])
     
-    # Response mit CSV-Daten
     csv_data = output.getvalue()
     output.close()
     
@@ -471,6 +395,20 @@ def admin_export_csv_jahrgang(jahrgang_id):
     response.headers['Content-Disposition'] = f'attachment; filename="{dateiname}"'
     
     return response
+
+@app.route('/admin/delete/<int:schueler_id>')
+def admin_delete_schueler(schueler_id):
+    """Lösche einen Schüler-Eintrag"""
+    if 'admin_logged_in' not in flask.session:
+        return flask.redirect(flask.url_for('admin_login'))
+    
+    conn = get_db_connection()
+    conn.execute('DELETE FROM schueler_daten WHERE id = ?', (schueler_id,))
+    conn.commit()
+    conn.close()
+    
+    flask.flash('Eintrag erfolgreich gelöscht!', 'success')
+    return flask.redirect(flask.url_for('admin_dashboard'))
 
 @app.route('/admin/benutzer')
 def admin_benutzer():
@@ -615,11 +553,7 @@ def admin_delete_benutzer(benutzer_id):
     
     return flask.redirect(flask.url_for('admin_benutzer'))
 
-@app.route('/datenschutz')
-def datenschutz():
-    """Datenschutzerklärung"""
-    return flask.render_template('datenschutz.html')
+
 
 if __name__ == '__main__':
-    init_db()  # Datenbank initialisieren
     app.run(port=80, debug=True, host='0.0.0.0')

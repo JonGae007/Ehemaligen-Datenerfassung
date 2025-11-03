@@ -77,7 +77,7 @@
                                         {% if jahrgang.schueler_anzahl > 0 %}
                                         <a href="{{ url_for('admin_export_csv_jahrgang', jahrgang_id=jahrgang.id) }}" 
                                            class="export-btn-small">
-                                            CSV
+                                            Exportieren
                                         </a>
                                         {% endif %}
                                         <a href="{{ url_for('admin_toggle_jahrgang', jahrgang_id=jahrgang.id) }}" 
